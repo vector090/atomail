@@ -145,7 +145,10 @@ def decode_header(header, default) :
     # Iso8859-1.
     if not encoding :
       encoding = DEFAULT_ENCODING
-    decoded_header += result.decode(encoding, "ignore") if encoding else result
+    if isinstance(result, bytes):
+      decoded_header += result.decode(encoding, "ignore") if encoding else result.decode('utf-8')
+    else:
+      decoded_header += result
   return decoded_header
 
 def get_charset(message, default="ascii"):
@@ -206,7 +209,7 @@ class MessageFeed :
 
     # Author
     from_address = decode_header(message["From"], "Anonymous")
-    (name,address) = email.Utils.parseaddr(from_address)
+    (name,address) = email.utils.parseaddr(from_address)
     author = self.doc.createElement('author')
     author_name = self.doc.createElement('name')
     if name and address :
@@ -246,7 +249,7 @@ class MessageFeed :
     contents = message_contents(message, get_charset(message))
     if contents :
       # Add the preferred content
-      contents.sort(lambda x, y : cmp(x,y))
+      contents.sort()
       (content_type,content_text) = contents[0]
 
       # Replace text content with HTML counterpart (if there is none)
@@ -276,7 +279,7 @@ class MessageFeed :
 
   def id(self) :
     """Returns the unique identifier of this feed"""
-    return filter(lambda x : x.parentNode == self.doc.documentElement, self.doc.documentElement.getElementsByTagName('id'))[0].childNodes[0].data
+    return list(filter(lambda x : x.parentNode == self.doc.documentElement, self.doc.documentElement.getElementsByTagName('id')))[0].childNodes[0].data
   
   def contains_message(self, message) :
     id = message_id(message)
@@ -290,7 +293,7 @@ class MessageFeed :
 
   def updated(self) :
     """Returns the last time this feed was updated (as a datetime object)"""
-    return from_atom_date(filter(lambda x : x.parentNode == self.doc.documentElement, self.doc.documentElement.getElementsByTagName('updated'))[0].childNodes[0].data)
+    return from_atom_date(list(filter(lambda x : x.parentNode == self.doc.documentElement, self.doc.documentElement.getElementsByTagName('updated')))[0].childNodes[0].data)
 
   def set_id(self, id) :
     """Sets the unique identifier of this feed"""
@@ -316,7 +319,7 @@ class MessageFeed :
   def replace_element(self,element) :
     """Replaces a toplevel element in the feed"""
     # Try to find the relevant node node
-    nodes = filter(lambda x : x.parentNode == self.doc.documentElement, self.doc.documentElement.getElementsByTagName(element.tagName))
+    nodes = list(filter(lambda x : x.parentNode == self.doc.documentElement, self.doc.documentElement.getElementsByTagName(element.tagName)))
     if nodes :
       self.doc.documentElement.replaceChild(element,nodes[0])
     
@@ -359,7 +362,7 @@ class MessageFeed :
     self.set_generator()
     self.trim_entries()
     logging.info('Writing feed to file ' + self.filename)
-    out = open(self.filename, 'w')
+    out = open(self.filename, 'wb')
     out.write(self.doc.toxml('utf-8'))
     out.close()
 
@@ -437,7 +440,7 @@ class POP3Source(MailSource) :
     while nb_messages > 0 :
       message_text = ''
       for j in self.pop.retr(nb_messages)[1]:
-        message_text += j + '\n'
+        message_text += j.decode('utf-8') + '\n'
       message = email.message_from_string(message_text)
       if message :
         yield message
