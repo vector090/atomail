@@ -2,22 +2,29 @@
 import imaplib
 import getpass
 import logging
+import os
 
 logging.basicConfig(level=logging.INFO)
 
 def test_imap_connection():
-    host = 'imap.126.com'
-    port = 993
+    # Get configuration from environment variables or prompt
+    host = os.environ.get('IMAP_HOST', 'imap.126.com')
+    port = int(os.environ.get('IMAP_PORT', '993'))
+    user = os.environ.get('IMAP_USER')
+    password = os.environ.get('IMAP_PASSWORD')
     
-    print("Testing IMAP connection to 126.com")
-    user = input("Email address: ")
-    password = getpass.getpass("Password: ")
+    if not user:
+        user = input("Email address: ")
+    if not password:
+        password = getpass.getpass("Password: ")
+    
+    print(f"Testing IMAP connection to {host}:{port}")
     
     try:
         logging.info(f'Connecting to {host}:{port}')
         imap = imaplib.IMAP4_SSL(host, port)
         
-        logging.info('Logging in...')
+        logging.info(f'Logging in as {user}...')
         imap.login(user, password)
         logging.info('Login successful!')
         
@@ -45,10 +52,15 @@ def test_imap_connection():
     except Exception as e:
         logging.error(f'Connection test failed: {e}')
         logging.error('\nTroubleshooting tips:')
-        logging.error('1. Ensure IMAP is enabled in your 126.com account settings')
+        logging.error('1. Ensure IMAP is enabled in your email account settings')
         logging.error('2. Try using an app-specific password instead of your regular password')
         logging.error('3. Check if your account has any security restrictions')
-        logging.error('4. Visit https://mail.126.com and check account security settings')
+        logging.error('4. Verify the server address and port are correct')
+        logging.error('\nEnvironment variables:')
+        logging.error('  IMAP_HOST - IMAP server address (default: imap.126.com)')
+        logging.error('  IMAP_PORT - IMAP server port (default: 993)')
+        logging.error('  IMAP_USER - Email address')
+        logging.error('  IMAP_PASSWORD - Password or app-specific password')
 
 if __name__ == '__main__':
     test_imap_connection()

@@ -12,6 +12,6 @@ python3 atomail.py \
   --uri http://example.com/feed.xml \
   --title "My POP3 Feed" \
   -d \
-  pop3.xml
+  $0.xml
 
 exit
