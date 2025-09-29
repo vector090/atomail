@@ -433,24 +433,33 @@ class POP3Source(MailSource) :
     # Enable debug logging for POP3 protocol
     self.pop.set_debuglevel(1)
     
+    # Log server greeting
+    logging.debug('POP3: Server greeting: ' + str(self.pop.getwelcome()))
+    
     logging.info('Authenticating')
-    logging.debug('POP3: Sending USER command')
-    self.pop.user(user)
+    logging.debug('POP3: Sending USER command for user: ' + user)
+    user_response = self.pop.user(user)
+    logging.debug('POP3: USER response: ' + str(user_response))
     logging.debug('POP3: Sending PASS command')
-    self.pop.pass_(password)
+    pass_response = self.pop.pass_(password)
+    logging.debug('POP3: PASS response: ' + str(pass_response))
 
   def messages(self) :
     logging.info('Retrieving POP3 list')
     logging.debug('POP3: Sending LIST command')
     pop_list = self.pop.list()
-    logging.debug('POP3: LIST response: ' + str(pop_list))
+    logging.debug('POP3: Raw LIST response: ' + str(pop_list))
+    logging.debug('POP3: LIST response code: ' + str(pop_list[0]))
+    logging.debug('POP3: LIST response data: ' + str(pop_list[1]))
     nb_messages = len(pop_list[1])
     logging.debug(str(nb_messages) + ' messages waiting')
     while nb_messages > 0 :
       logging.debug('POP3: Retrieving message ' + str(nb_messages))
       logging.debug('POP3: Sending RETR command for message ' + str(nb_messages))
       retr_response = self.pop.retr(nb_messages)
-      logging.debug('POP3: RETR response status: ' + str(retr_response[0]))
+      logging.debug('POP3: Raw RETR response: ' + str(retr_response))
+      logging.debug('POP3: RETR response code: ' + str(retr_response[0]))
+      logging.debug('POP3: RETR message lines count: ' + str(len(retr_response[1])))
       message_text = ''
       for j in retr_response[1]:
         message_text += j.decode('utf-8') + '\n'

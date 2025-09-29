@@ -13,3 +13,5 @@ python3 atomail.py \
   --title "My POP3 Feed" \
   -d \
   feed.xml
+
+exit
