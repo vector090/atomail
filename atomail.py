@@ -48,7 +48,10 @@ import sys, os.path, optparse, datetime, email, email.header, email.utils, re, x
 import string, logging, hashlib, math
 from xml.dom import minidom
 import nntplib, imaplib, poplib, mailbox
-import cgi
+try:
+    from html import escape as html_escape
+except ImportError:
+    from cgi import escape as html_escape
 
 ################################################################################
 # Constants
@@ -257,7 +260,7 @@ class MessageFeed :
       # mails are typically formatted, we don't want this, so we use preformatted
       if content_type == "text":
         content_type = "html"
-        content_text = "<pre>" + cgi.escape(content_text) + "</pre>"
+        content_text = "<pre>" + html_escape(content_text) + "</pre>"
 
       content.setAttribute('type',content_type)
       content.appendChild(self.doc.createTextNode(content_text))
