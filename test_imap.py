@@ -22,7 +22,50 @@ def test_imap_connection():
     
     try:
         logging.info(f'Connecting to {host}:{port}')
-        imap = imaplib.IMAP4_SSL(host, port)
+        
+        # Choose connection type based on port
+        if port == 993 or port == 585:
+            # SSL/TLS ports - use SSLv23 with TLS 1.2 for imap.139.com compatibility
+            logging.info('Using SSL/TLS connection')
+            try:
+                import ssl
+                
+                # This server (imap.139.com) requires SSLv23 protocol with TLS 1.2
+                logging.info('Creating SSL context with SSLv23 protocol...')
+                context = ssl.SSLContext(ssl.PROTOCOL_SSLv23)
+                context.check_hostname = False
+                context.verify_mode = ssl.CERT_NONE
+                
+                # Set compatible cipher suite
+                try:
+                    context.set_ciphers('AES256-GCM-SHA384:AES128-GCM-SHA256:HIGH:!aNULL:!eNULL')
+                except:
+                    pass  # Use default ciphers if specific ones fail
+                
+                imap = imaplib.IMAP4_SSL(host, port, ssl_context=context)
+                logging.info('SSL connection successful!')
+                
+            except Exception as ssl_err:
+                logging.error(f'SSL connection failed: {ssl_err}')
+                raise
+                    
+        elif port == 143:
+            # Plain text port - start TLS if available
+            imap = imaplib.IMAP4(host, port)
+            try:
+                # Try to upgrade to TLS
+                imap.starttls()
+                logging.info('Connection upgraded to TLS')
+            except:
+                logging.info('Using plain text connection (no TLS)')
+        else:
+            # Default to plain connection for other ports
+            imap = imaplib.IMAP4(host, port)
+            logging.info('Using plain IMAP connection')
+        
+        # Set socket timeout for long operations
+        import socket
+        imap.socket().settimeout(30)
         
         logging.info(f'Logging in as {user}...')
         imap.login(user, password)
