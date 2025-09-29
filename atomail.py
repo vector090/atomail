@@ -424,14 +424,19 @@ class POP3Source(MailSource) :
   
   def __init__(self, host, port, user, password, ssl=False) :
     logging.info('Initializing POP3 client')
+    logging.info('Connecting to POP3 server: %s:%s (SSL: %s)' % (host, port if port else 'default', ssl))
     if ssl :
       pop = poplib.POP3_SSL
     else :
       pop = poplib.POP3
     if port :
+      actual_port = port
       self.pop = pop(host,port)
     else :
+      actual_port = 995 if ssl else 110
       self.pop = pop(host)
+    
+    logging.info('Connected to POP3 server: %s:%s (SSL: %s)' % (host, actual_port, 'Yes' if ssl else 'No'))
     
     # Enable debug logging for POP3 protocol
     self.pop.set_debuglevel(1)
@@ -479,11 +484,16 @@ class NNTPSource(MailSource) :
 
   def __init__(self, host, port, group, user, password) :
     logging.info('Initializing NNTP client')
+    logging.info('Connecting to NNTP server: %s:%s (group: %s)' % (host, port if port else 'default', group))
     if port :
+      actual_port = port
       self.nntp = nntplib.NNTP(host,port,user=user,password=password)
     else :
+      actual_port = 119
       self.nntp = nntplib.NNTP(host,user=user,password=password)
     self.group = group
+    
+    logging.info('Connected to NNTP server: %s:%s (group: %s, SSL: No)' % (host, actual_port, group))
 
   def messages(self) :
     logging.info('Retrieving article list')
@@ -511,6 +521,7 @@ class IMAPSource(MailSource) :
 
   def __init__(self, host, port, user, password, mailbox, ssl=False) :
     logging.info('Initializing IMAP client')
+    logging.info('Connecting to server: %s:%s (SSL: %s)' % (host, port if port else 'default', ssl))
     if ssl :
       imap = imaplib.IMAP4_SSL
     else :
@@ -520,6 +531,7 @@ class IMAPSource(MailSource) :
         if ssl :
           # For SSL connections, use custom SSL context for compatibility
           import ssl
+          actual_port = port
           logging.info('Creating SSL context with SSLv23 protocol for compatibility...')
           # Use PROTOCOL_TLS for modern Python versions, fallback to PROTOCOL_SSLv23
           protocol = getattr(ssl, 'PROTOCOL_TLS', ssl.PROTOCOL_SSLv23)
@@ -532,10 +544,12 @@ class IMAPSource(MailSource) :
             pass
           self.imap = imap(host, port, ssl_context=context)
         else:
+          actual_port = port
           self.imap = imap(host,port)
       else :
         # Default ports: 993 for SSL, 143 for non-SSL
         if ssl :
+          actual_port = 993
           # For SSL connections, use custom SSL context for compatibility
           import ssl
           logging.info('Creating SSL context with SSLv23 protocol for compatibility...')
@@ -550,7 +564,10 @@ class IMAPSource(MailSource) :
             pass
           self.imap = imap(host, 993, ssl_context=context)
         else :
+          actual_port = 143
           self.imap = imap(host, 143)
+      
+      logging.info('Connected to %s:%s (SSL: %s)' % (host, actual_port, 'Yes' if ssl else 'No'))
       logging.info('Authenticating with user: ' + user)
       try :
         self.imap.login(user,password)
