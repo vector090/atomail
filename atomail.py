@@ -515,33 +515,116 @@ class IMAPSource(MailSource) :
       imap = imaplib.IMAP4_SSL
     else :
       imap = imaplib.IMAP4
-    if port :
-      self.imap = imap(host,port)
-    else :
-      self.imap = imap(host)
-    logging.info('Authenticating')
-    self.imap.login(user,password)
-    if mailbox :
-      logging.info('Opening mailbox \'' + mailbox + '\'')
-      self.imap.select(mailbox=mailbox)
-    else :
-      logging.info('Opening INBOX')
-      self.imap.select()
+    try :
+      if port :
+        if ssl :
+          # For SSL connections, use custom SSL context for compatibility
+          import ssl
+          logging.info('Creating SSL context with SSLv23 protocol for compatibility...')
+          # Use PROTOCOL_TLS for modern Python versions, fallback to PROTOCOL_SSLv23
+          protocol = getattr(ssl, 'PROTOCOL_TLS', ssl.PROTOCOL_SSLv23)
+          context = ssl.SSLContext(protocol)
+          context.check_hostname = False
+          context.verify_mode = ssl.CERT_NONE
+          try:
+            context.set_ciphers('AES256-GCM-SHA384:AES128-GCM-SHA256:HIGH:!aNULL:!eNULL')
+          except:
+            pass
+          self.imap = imap(host, port, ssl_context=context)
+        else:
+          self.imap = imap(host,port)
+      else :
+        # Default ports: 993 for SSL, 143 for non-SSL
+        if ssl :
+          # For SSL connections, use custom SSL context for compatibility
+          import ssl
+          logging.info('Creating SSL context with SSLv23 protocol for compatibility...')
+          # Use PROTOCOL_TLS for modern Python versions, fallback to PROTOCOL_SSLv23
+          protocol = getattr(ssl, 'PROTOCOL_TLS', ssl.PROTOCOL_SSLv23)
+          context = ssl.SSLContext(protocol)
+          context.check_hostname = False
+          context.verify_mode = ssl.CERT_NONE
+          try:
+            context.set_ciphers('AES256-GCM-SHA384:AES128-GCM-SHA256:HIGH:!aNULL:!eNULL')
+          except:
+            pass
+          self.imap = imap(host, 993, ssl_context=context)
+        else :
+          self.imap = imap(host, 143)
+      logging.info('Authenticating with user: ' + user)
+      try :
+        self.imap.login(user,password)
+        logging.info('Authentication successful')
+      except Exception as auth_err :
+        logging.error('Authentication failed: ' + str(auth_err))
+        # Try PLAIN authentication method
+        try :
+          logging.info('Trying PLAIN authentication method')
+          import base64
+          auth_string = base64.b64encode(('\x00' + user + '\x00' + password).encode('utf-8')).decode('utf-8')
+          status, _ = self.imap.authenticate('PLAIN', lambda x: auth_string)
+          if status == 'OK' :
+            logging.info('PLAIN authentication successful')
+          else :
+            raise Exception('PLAIN authentication failed: ' + status)
+        except Exception as plain_err :
+          logging.error('PLAIN authentication also failed: ' + str(plain_err))
+          raise auth_err
+      
+      # List available mailboxes to debug
+      status, mailboxes = self.imap.list()
+      if status == 'OK' :
+        logging.info('Available mailboxes:')
+        for mailbox_info in mailboxes :
+          logging.info('  ' + mailbox_info.decode('utf-8'))
+      
+      if mailbox :
+        logging.info('Opening mailbox \'' + mailbox + '\'')
+        status, data = self.imap.select(mailbox=mailbox)
+      else :
+        logging.info('Opening INBOX')
+        # Try INBOX with different cases and formats
+        for inbox_name in ['INBOX', 'Inbox', 'inbox'] :
+          status, data = self.imap.select(mailbox=inbox_name)
+          if status == 'OK' :
+            logging.info('Successfully opened mailbox: ' + inbox_name)
+            break
+          else :
+            logging.info('Failed to open ' + inbox_name + ': ' + str(data))
+      
+      logging.info('Select response: ' + status + ' - ' + str(data))
+      if status != 'OK' :
+        raise Exception('Failed to select mailbox: ' + status)
+    except Exception as e :
+      logging.error('IMAP initialization failed: ' + str(e))
+      raise
 
   def messages(self) :
     logging.info('Retrieving relevant message numbers')
-    _, msgnums =  self.imap.search(None,'ALL')
-    msg_numbers = msgnums[0].split()
-    while msg_numbers :
-      msg_number = msg_numbers.pop()
-      logging.info('Fetching article ' + msg_number.decode('utf-8'))
-      typ, data = self.imap.fetch(msg_number, '(RFC822)')
-      message_text = data[0][1].decode('utf-8')
-      message = email.message_from_string(message_text)
-      if message :
-        yield message
-      else :
-        logging.warn('Unable to parse message:\n' + message_text)
+    try :
+      status, msgnums = self.imap.search(None,'ALL')
+      if status != 'OK' :
+        logging.error('Search failed: ' + status)
+        return
+      if not msgnums or not msgnums[0] :
+        logging.info('No messages found')
+        return
+      msg_numbers = msgnums[0].split()
+      while msg_numbers :
+        msg_number = msg_numbers.pop()
+        logging.info('Fetching article ' + msg_number.decode('utf-8'))
+        typ, data = self.imap.fetch(msg_number, '(RFC822)')
+        if typ == 'OK' and data and data[0] :
+          message_text = data[0][1].decode('utf-8')
+          message = email.message_from_string(message_text)
+          if message :
+            yield message
+          else :
+            logging.warn('Unable to parse message:\n' + message_text)
+        else :
+          logging.warn('Failed to fetch message ' + msg_number.decode('utf-8'))
+    except Exception as e :
+      logging.error('Error retrieving messages: ' + str(e))
       
 
 ################################################################################
