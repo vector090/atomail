@@ -534,13 +534,14 @@ class IMAPSource(MailSource) :
     msg_numbers = msgnums[0].split()
     while msg_numbers :
       msg_number = msg_numbers.pop()
-      logging.info('Fetching article ' + msg_number)
+      logging.info('Fetching article ' + msg_number.decode('utf-8'))
       typ, data = self.imap.fetch(msg_number, '(RFC822)')
-      message = email.message_from_string(data[0][1])
+      message_text = data[0][1].decode('utf-8')
+      message = email.message_from_string(message_text)
       if message :
         yield message
       else :
-        logging.warn('Unable to parse message:\n' + data[0][1])
+        logging.warn('Unable to parse message:\n' + message_text)
       
 
 ################################################################################
