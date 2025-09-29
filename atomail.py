@@ -429,17 +429,30 @@ class POP3Source(MailSource) :
       self.pop = pop(host,port)
     else :
       self.pop = pop(host)
+    
+    # Enable debug logging for POP3 protocol
+    self.pop.set_debuglevel(1)
+    
     logging.info('Authenticating')
+    logging.debug('POP3: Sending USER command')
     self.pop.user(user)
+    logging.debug('POP3: Sending PASS command')
     self.pop.pass_(password)
 
   def messages(self) :
     logging.info('Retrieving POP3 list')
-    nb_messages = len(self.pop.list()[1])
+    logging.debug('POP3: Sending LIST command')
+    pop_list = self.pop.list()
+    logging.debug('POP3: LIST response: ' + str(pop_list))
+    nb_messages = len(pop_list[1])
     logging.debug(str(nb_messages) + ' messages waiting')
     while nb_messages > 0 :
+      logging.debug('POP3: Retrieving message ' + str(nb_messages))
+      logging.debug('POP3: Sending RETR command for message ' + str(nb_messages))
+      retr_response = self.pop.retr(nb_messages)
+      logging.debug('POP3: RETR response status: ' + str(retr_response[0]))
       message_text = ''
-      for j in self.pop.retr(nb_messages)[1]:
+      for j in retr_response[1]:
         message_text += j.decode('utf-8') + '\n'
       message = email.message_from_string(message_text)
       if message :

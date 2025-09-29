@@ -11,5 +11,5 @@ python3 atomail.py \
   --password 123456 \
   --uri http://example.com/feed.xml \
   --title "My POP3 Feed" \
-  -v \
+  -d \
   feed.xml
