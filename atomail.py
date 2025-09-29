@@ -44,8 +44,8 @@ __copyright__ = """
 # Imports
 ################################################################################
 
-import sys, os.path, optparse, datetime, email, email.header, email.Utils, re, xml
-import string, logging, md5, math
+import sys, os.path, optparse, datetime, email, email.header, email.utils, re, xml
+import string, logging, hashlib, math
 from xml.dom import minidom
 import nntplib, imaplib, poplib, mailbox
 import cgi
@@ -74,22 +74,22 @@ class TZ(datetime.tzinfo) :
     return datetime.timedelta(minutes=math.floor(self.seconds/60))
 
 def message_id(message) :
-  hash = md5.new()
+  hash = hashlib.md5()
   if message['From'] :
-    hash.update(message['From'])
+    hash.update(message['From'].encode('utf-8'))
   if message['Subject'] :
-    hash.update(message['Subject'])
+    hash.update(message['Subject'].encode('utf-8'))
   if message['Date'] :
-    hash.update(message['Date'])
+    hash.update(message['Date'].encode('utf-8'))
   return hash.hexdigest()
 
 def message_date(message) :
-  date = email.Utils.parsedate_tz(message["Date"])
+  date = email.utils.parsedate_tz(message["Date"])
   print(date)
   if date != None :
     return datetime.datetime(date[0],date[1],date[2],date[3],date[4],date[5],0,TZ(date[9]))
   else :
-    logging.warning('Unable to parse date \'' + message['Date'] + '\'')
+    logging.warning('Unable to parse date \'' + str(message['Date']) + '\'')
     return datetime.datetime(datetime.MINYEAR,1,1)
 
 def message_contents(message, default_charset) :
@@ -100,7 +100,7 @@ def message_contents(message, default_charset) :
   else :
     payload = message.get_payload(decode=True)
     if payload : 
-      content = unicode(payload, get_charset(message, default_charset), "replace")
+      content = str(payload, get_charset(message, default_charset), "replace")
       content_type = message.get_content_type()
       if content_type == 'text/plain' :
         contents = [('text',content)]
@@ -121,7 +121,7 @@ def from_atom_date(date) :
   microseconds = 0
   timezone = 0
   suffix = date[19:]
-  m = re.match("(\.(?P<microseconds>\d+))?(?P<timezone>(\+|-)\d\d)?",suffix)
+  m = re.match(r"(\.(?P<microseconds>\d+))?(?P<timezone>(\+|-)\d\d)?",suffix)
   if m != None :
     if m.group('microseconds') :
       microseconds = int(m.group('microseconds'))
@@ -236,7 +236,7 @@ class MessageFeed :
     title = self.doc.createElement('title')
     title_text = decode_header(message["Subject"], "(No Subject)")
     if self.strip_subject :
-      title_text = re.sub('\[[a-zA-Z0-9:_\. -]*\]\s*','',title_text)
+      title_text = re.sub(r'\[[a-zA-Z0-9:_\. -]*\]\s*','',title_text)
     title.appendChild(self.doc.createTextNode(title_text))
     entry.appendChild(title)
     logging.debug('Title: ' + title_text)
@@ -331,7 +331,7 @@ class MessageFeed :
     """Removes all the redundant and outdated entries"""
     logging.info('Trimming entries')
     entries = self.doc.documentElement.getElementsByTagName('entry')
-    entries.sort(lambda x, y : cmp(entry_date(x),entry_date(y)))
+    entries.sort(key=lambda x: entry_date(x))
 
     # Trim based on the maximum number of items
     if self.max_items > 0 :
@@ -465,9 +465,9 @@ class NNTPSource(MailSource) :
     while last >= first :
       logging.debug('Retrieving header of article ' + str(last))
       try :
-        head = string.join(self.nntp.head(str(last))[3],'\n')
+        head = '\n'.join(self.nntp.head(str(last))[3])
         message = email.message_from_string(head)
-        body = string.join(self.nntp.body(str(last))[3],'\n')
+        body = '\n'.join(self.nntp.body(str(last))[3])
         message = email.message_from_string(head + '\n' + body)
         if message :
           yield message
