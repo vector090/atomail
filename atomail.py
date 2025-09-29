@@ -470,7 +470,10 @@ class POP3Source(MailSource) :
       logging.debug('POP3: RETR message lines count: ' + str(len(retr_response[1])))
       message_text = ''
       for j in retr_response[1]:
-        message_text += j.decode('utf-8') + '\n'
+        try:
+          message_text += j.decode('utf-8') + '\n'
+        except UnicodeDecodeError:
+          message_text += j.decode('utf-8', errors='ignore') + '\n'
       message = email.message_from_string(message_text)
       if message :
         yield message
