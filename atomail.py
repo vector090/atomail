@@ -744,8 +744,10 @@ if __name__ == "__main__" :
   count = 0
   for message in source.messages() :
     if feed.contains_message(message) :
-      logging.info('Message already in feed. Stopped retrieving.')
-      break
+      #logging.info('Message already in feed. Stopped retrieving.')
+      logging.info('Message already in feed. skip')
+      #break
+      continue
     else :
       feed.add_message(message)
       count += 1
